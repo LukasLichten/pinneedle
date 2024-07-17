@@ -25,7 +25,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let app = axum::Router::new()
         .route("/", get(pages::index))
-        // .route("/post/:id", get(pages::post))
+        .route("/post/:id", get(pages::post))
         .route("/style.css", get(pages::serve_css_style))
         .with_state(config);
     let listener = TcpListener::bind("0.0.0.0:3000").await?;

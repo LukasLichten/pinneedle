@@ -1,4 +1,7 @@
+use std::{error::Error, os::unix::fs::MetadataExt, path::PathBuf};
+
 use log::{error, info};
+use tokio::process::Command;
 
 use crate::Config;
 
@@ -51,4 +54,36 @@ pub fn clone_repo(config: &Config) -> bool {
     error!("Clone unsucessful, {err}");
 
     return false;
+}
+
+pub async fn get_creation_date(config: &Config, path: &PathBuf) -> Result<i64, Box<dyn Error>> {
+    if use_git(config) {
+        let child = Command::new("git")
+            .arg("-C")
+            .arg(config.folder_path.as_path())
+            .arg("log")
+            .arg("--pretty=format:\"%at\"")
+            .arg("--reverse")
+            .arg("--")
+            .arg(path.as_path())
+            .spawn()?;
+
+        let out = child.wait_with_output().await?;
+
+        if !out.status.success() {
+            return Err(out.status.to_string().into());
+        }
+
+        let s = String::from_utf8(out.stdout)?;
+        let stamp: i64 = match s.split('\n').next() {
+            Some(item) => item.parse()?,
+            None => return Err("Unable to extract anything out of stdout".into())
+        };
+
+        Ok(stamp)
+    } else {
+        let meta = std::fs::metadata(path.as_path())?;
+        Ok(meta.ctime())
+    }
+
 }
