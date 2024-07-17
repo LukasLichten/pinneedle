@@ -1,0 +1,15 @@
+[package]
+name = "pinneedle"
+version = "0.1.0"
+edition = "2021"
+authors = ["Lukas 'DerGeneralFluff' Lichten"]
+license = "GPL-3.0"
+repository = "https://github.com/LukasLichten/pinneedle"
+description = "Ultra Simple Blogging server using markdown, axum and git"
+
+[dependencies]
+log = "^0.4"
+env_logger="0.10"
+tokio = { version = "1", features = ["full"] }
+axum = "0.7.2"
+maud = { version = "*", features = ["axum"] }
