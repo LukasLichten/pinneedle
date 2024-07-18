@@ -1,6 +1,6 @@
 use std::{error::Error, os::unix::fs::MetadataExt, path::PathBuf};
 
-use log::{error, info};
+use log::{debug, error, info};
 use tokio::process::Command;
 
 use crate::Config;
@@ -86,4 +86,39 @@ pub async fn get_creation_date(config: &Config, path: &PathBuf) -> Result<i64, B
         Ok(meta.ctime())
     }
 
+}
+
+const UPDATER_SLEEP_DURATION: std::time::Duration = std::time::Duration::from_secs(5 * 60);
+
+pub async fn updater(config: &'static Config) {
+    async fn single_iteration(config: &Config) -> Result<(),Box<dyn Error>> {
+        let mut child = Command::new("git")
+            .arg("-C")
+            .arg(config.folder_path.as_path())
+            .arg("pull")
+            .spawn()?;
+        
+        let status = child.wait().await?;
+
+        if !status.success() {
+            return Err(
+                if let Some(code) = status.code() {
+                    format!("command exited with code {code}")
+                } else {
+                    format!("command terminated unsuccessfully")
+                }.into()
+            );
+        }
+
+        Ok(())
+    }
+    
+    loop {
+        match single_iteration(config).await {
+            Ok(()) => debug!("Checked Repo successfully for updates"),
+            Err(e) => error!("Error occured when trying to pull repo: {e}")
+        };
+
+        tokio::time::sleep(UPDATER_SLEEP_DURATION).await;
+    }
 }

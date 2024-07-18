@@ -1,4 +1,4 @@
-use std::{path::PathBuf, str::FromStr, sync::Arc};
+use std::{path::PathBuf, str::FromStr};
 
 use axum::routing::get;
 use log::{error, info};
@@ -19,14 +19,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     info!("Reading Enviroment...");
 
-    let config = Arc::new(Config::new());
+    let config: &'static Config = Box::leak(Box::new(Config::new()));
 
     info!("Starting up webserver...");
 
+    if config.git_repo.is_some() {
+        info!("Starting Git-Updater Background task...");
+        tokio::spawn(git::updater(config));
+    }
+
     let app = axum::Router::new()
         .route("/", get(pages::index))
+        .route("/about", get(pages::about))
         .route("/post/:id", get(pages::post))
+        // TODO serving resources like images
         .route("/style.css", get(pages::serve_css_style))
+        .route("/favicon.ico", get(pages::serve_favicon))
         .with_state(config);
     let listener = TcpListener::bind("0.0.0.0:3000").await?;
 
