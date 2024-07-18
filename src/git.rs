@@ -1,4 +1,4 @@
-use std::{error::Error, os::unix::fs::MetadataExt, path::PathBuf};
+use std::{error::Error, os::unix::fs::MetadataExt, path::PathBuf, process::Stdio};
 
 use log::{debug, error, info};
 use tokio::process::Command;
@@ -33,6 +33,9 @@ pub fn clone_repo(config: &Config) -> bool {
         .arg("clone")
         .arg(config.git_repo.as_ref().expect("we exit if inactive anyway"))
         .arg(config.folder_path.as_path())
+
+        .stderr(Stdio::null()) // for some fucking reason this logs to stderr
+
         .spawn().map(|mut child| child.wait()) {
 
         Ok(Ok(status)) => {
@@ -58,17 +61,19 @@ pub fn clone_repo(config: &Config) -> bool {
 
 pub async fn get_creation_date(config: &Config, path: &PathBuf) -> Result<i64, Box<dyn Error>> {
     if use_git(config) {
-        let child = Command::new("git")
+
+        let path = path.strip_prefix(&config.folder_path)?;
+
+        let out = Command::new("git")
             .arg("-C")
             .arg(config.folder_path.as_path())
             .arg("log")
-            .arg("--pretty=format:\"%at\"")
+            .arg("--pretty=format:%at")
             .arg("--reverse")
             .arg("--")
-            .arg(path.as_path())
-            .spawn()?;
+            .arg(path)
 
-        let out = child.wait_with_output().await?;
+            .output().await?;
 
         if !out.status.success() {
             return Err(out.status.to_string().into());
@@ -96,6 +101,10 @@ pub async fn updater(config: &'static Config) {
             .arg("-C")
             .arg(config.folder_path.as_path())
             .arg("pull")
+
+            .stdout(Stdio::null()) 
+            // stderror we leave attached, so errors can be seen still
+
             .spawn()?;
         
         let status = child.wait().await?;
